@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# ※ 使いやすさのため、左上を原点とした座標で処理できるようにしている。
+# 　 TYPE340が扱う通りの左下を原点とした座標の場合は
+#    --bl-orig オプションを指定すること。
+# ※ 入力ファイル形式はCSVだが、空行と'#'で始まる行は
+#    無視されるので含めても構わない。
+
+. type340/driver.sh
+
+set -ue
+# set -uex
+
+usage() {
+	echo 'Usage:' 1>&2
+	echo -e "\t$0 [--bl-orig] SRC_LD_CSV DST_ML_TXT" 1>&2
+	echo -e "\t$0 -h" 1>&2
+}
+
+ORIG='tl'
+MAX_Y=1023
+PREV_X=0
+PREV_Y=0
+
+if [ $# -eq 1 ] && [ "$1" = '-h' ]; then
+	usage
+	exit 0
+fi
+if [ $# -eq 3 ] && [ "$1" = '--bl-orig' ]; then
+	ORIG='bl'
+	shift
+fi
+if [ $# -ne 2 ]; then
+	usage
+	exit 1
+fi
+
+SRC_LD_CSV=$1
+DST_ML_TXT=$2
+
+# 空行と'#'で始まる行を除外する
+grep -vE '^$|^#' $SRC_LD_CSV >$DST_ML_TXT.tmp
+trap "rm $DST_ML_TXT.tmp" EXIT
+
+for row in $(cat $DST_ML_TXT.tmp); do
+	op=$(echo $row | cut -d',' -f1)
+	cur_x=$(echo $row | cut -d',' -f2)
+	cur_y=$(echo $row | cut -d',' -f3)
+	if [ "$ORIG" = 'tl' ]; then
+		cur_y=$((MAX_Y - cur_y))
+	fi
+
+	if [ "$op" = 's' ]; then
+		type340_drv_set_position $cur_x $cur_y
+	else
+		escape=0
+		if [ "$op" = 'e' ]; then
+			escape=1
+		fi
+		delta_x=$((cur_x - PREV_X))
+		delta_y=$((cur_y - PREV_Y))
+		type340_drv_draw_line $delta_x $delta_y $escape
+	fi
+
+	PREV_X=$cur_x
+	PREV_Y=$cur_y
+done >$DST_ML_TXT
+
+type340_drv_end_drawing >>$DST_ML_TXT

@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# ※ 入力画像の高さと幅は等しいこと
+
+set -ue
+# set -uex
+
+usage() {
+	echo 'Usage:' 1>&2
+	echo -e "\t$0 SRC_SVG DST_LD_CSV" 1>&2
+	echo -e "\t$0 -h" 1>&2
+}
+
+# Type 340の幅あるいは高さ
+TY340_WOH=1024
+
+if [ $# -eq 1 ] && [ "$1" = '-h' ]; then
+	usage
+	exit 0
+fi
+if [ $# -ne 2 ]; then
+	usage
+	exit 1
+fi
+
+SRC_SVG=$1
+DST_LD_CSV=$2
+
+# 入力画像の幅あるいは高さを取得
+# (どちらでも良い。ここでは幅を取得している)
+IMG_WOH=$(grep '^<svg ' $SRC_SVG | sed -r 's/^.+viewBox="[0-9]+ [0-9]+ ([0-9]+) [0-9]+".+$/\1/')
+
+# "<path fill"で始まるタグのd要素毎に開始座標と終了座標をCSV出力
+(
+	for start_end in $(grep '<path fill' $SRC_SVG | sed -r 's/^.+d="M ([0-9]+),([0-9]+) L ([0-9]+),([0-9]+)".+$/\1,\2,\3,\4/'); do
+		sx=$(echo $start_end | cut -d',' -f1)
+		sy=$(echo $start_end | cut -d',' -f2)
+		ex=$(echo $start_end | cut -d',' -f3)
+		ey=$(echo $start_end | cut -d',' -f4)
+		# echo "sx=$sx, sy=$sy, ex=$ex, ey=$ey"
+
+		out_sx=$(bc <<< "scale=10;($sx / $IMG_WOH) * $TY340_WOH + 0.5" | cut -d'.' -f1)
+		out_sy=$(bc <<< "scale=10;($sy / $IMG_WOH) * $TY340_WOH + 0.5" | cut -d'.' -f1)
+		out_ex=$(bc <<< "scale=10;($ex / $IMG_WOH) * $TY340_WOH + 0.5" | cut -d'.' -f1)
+		out_ey=$(bc <<< "scale=10;($ey / $IMG_WOH) * $TY340_WOH + 0.5" | cut -d'.' -f1)
+		# echo "out_sx=$out_sx, out_sy=$out_sy, out_ex=$out_ex, out_ey=$out_ey"
+
+		echo "s,$out_sx,$out_sy"
+		echo "e,$out_ex,$out_ey"
+	done
+) >$DST_LD_CSV
