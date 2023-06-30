@@ -1,0 +1,10 @@
+d -m 100 law 1000
+d -m 101 idla
+d -m 102 idsi
+d -m 103 jmp 102
+d -m 104 jmp 100
+set g2out disabled
+set dpy enabled
+d pc 100
+run
+exit
