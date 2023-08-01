@@ -1,0 +1,142 @@
+#!/bin/bash
+
+set -ue
+# set -uex
+
+# Type 340の機械語を生成するスクリプト
+# ※ 第2引数以降は10進数で指定すること
+
+usage_param() {
+	echo -e "\t$0 param NEXT_MODE STOP SET_SCALE SCALE SET_INTENSITY INTENSITY"
+}
+
+usage_point() {
+	echo -e "\t$0 point IS_Y NEXT_MODE DRAW COORD_VAL"
+}
+
+usage_vector() {
+	echo -e "\t$0 vector ESCAPE DRAW DOWN_DIR DY LEFT_DIR DX"
+}
+
+usage() {
+	echo 'Usage:'
+	usage_param
+	usage_point
+	usage_vector
+	echo -e "\t$0 -h"
+}
+
+if [ $# -eq 0 ]; then
+	usage 1>&2
+	exit 1
+fi
+if [ $# -eq 1 ]; then
+	if [ "$1" = '-h' ]; then
+		usage
+		exit 0
+	else
+		usage 1>&2
+		exit 1
+	fi
+fi
+
+MODE=$1
+shift
+
+as_param() {
+	if [ $# -ne 6 ]; then
+		echo 'Usage:' 1>&2
+		usage_param 1>&2
+		exit 1
+	fi
+
+	local next_mode=$1
+	local stop=$2
+	local set_scale=$3
+	local scale=$4
+	local set_intensity=$5
+	local intensity=$6
+
+	# 2ビット以上のものを桁を補完しつつ2進数へ変換
+	local next_mode_bin=$(printf "%03d" $(bc <<< "obase=2;$next_mode"))
+	local scale_bin=$(printf "%02d" $(bc <<< "obase=2;$scale"))
+	local intensity_bin=$(printf "%03d" $(bc <<< "obase=2;$intensity"))
+
+	# 機械語を18桁の2進数で作成
+	local ml_bin="00${next_mode_bin}00${stop}${stop}00${set_scale}${scale_bin}${set_intensity}${intensity_bin}"
+
+	# 6桁の8進数へ変換
+	local ml_oct=$(printf "%06d" $(bc <<< "obase=8;ibase=2;$ml_bin"))
+
+	# 結果表示
+	echo $ml_oct
+}
+
+as_point() {
+	if [ $# -ne 4 ]; then
+		echo 'Usage:' 1>&2
+		usage_point 1>&2
+		exit 1
+	fi
+
+	local is_y=$1
+	local next_mode=$2
+	local draw=$3
+	local coord_val=$4
+
+	# 2ビット以上のものを桁を補完しつつ2進数へ変換
+	local next_mode_bin=$(printf "%03d" $(bc <<< "obase=2;$next_mode"))
+	local coord_val_bin=$(printf "%010d" $(bc <<< "obase=2;$coord_val"))
+
+	# 機械語を18桁の2進数で作成
+	local ml_bin="0${is_y}${next_mode_bin}00${draw}${coord_val_bin}"
+
+	# 6桁の8進数へ変換
+	local ml_oct=$(printf "%06d" $(bc <<< "obase=8;ibase=2;$ml_bin"))
+
+	# 結果表示
+	echo $ml_oct
+}
+
+as_vector() {
+	if [ $# -ne 6 ]; then
+		echo 'Usage:' 1>&2
+		usage_vector 1>&2
+		exit 1
+	fi
+
+	local escape=$1
+	local draw=$2
+	local down_dir=$3
+	local dy=$4
+	local left_dir=$5
+	local dx=$6
+
+	# 2ビット以上のものを桁を補完しつつ2進数へ変換
+	local dy_bin=$(printf "%07d" $(bc <<< "obase=2;$dy"))
+	local dx_bin=$(printf "%07d" $(bc <<< "obase=2;$dx"))
+
+	# 機械語を18桁の2進数で作成
+	local ml_bin="${escape}${draw}${down_dir}${dy_bin}${left_dir}${dx_bin}"
+
+	# 6桁の8進数へ変換
+	local ml_oct=$(printf "%06d" $(bc <<< "obase=8;ibase=2;$ml_bin"))
+
+	# 結果表示
+	echo $ml_oct
+}
+
+case "$MODE" in
+'param')
+	as_param $*
+	;;
+'point')
+	as_point $*
+	;;
+'vector')
+	as_vector $*
+	;;
+*)
+	usage 1>&2
+	exit 1
+esac
